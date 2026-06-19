@@ -1,0 +1,17 @@
+# ReXGlue analysis hints for Libre Army of Two.
+#
+# Add only observed function hints here, usually after a ReXGlue log reports an
+# invalid or unregistered guest function address during local testing.
+#
+# Example:
+# [functions."0x82000000"]
+# name = "sub_82000000"
+
+[functions."0x82CAB898"]
+name = "sub_82CAB898"
+
+[functions."0x82734628"]
+name = "sub_82734628"
+
+[functions."0x82BC3110"]
+name = "sub_82BC3110"

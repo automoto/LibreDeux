@@ -1,0 +1,43 @@
+# User-supplied game inputs. Do not commit these.
+game/
+iso/
+assets/
+private/
+*.iso
+*.xex
+*.xexp
+*.bin
+*.pe
+
+# Generated from a user's own game copy.
+generated/*
+!generated/.gitkeep
+config/generated/
+ppc/
+
+# Local toolchains, captures, and outputs.
+tools/
+rexglue-install/
+.venv/
+.tmp/
+artifacts/
+logs/
+*.log
+*.png
+
+# CMake/build/install outputs.
+build/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+install/
+
+# Python/editor/OS noise.
+__pycache__/
+*.py[cod]
+.vs/
+.vscode/
+Thumbs.db
+Desktop.ini

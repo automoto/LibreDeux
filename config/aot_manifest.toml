@@ -1,0 +1,9 @@
+[project]
+name = "aot"
+sdk_version = "0.8.1.4"
+game_root = "../game"
+
+[entrypoint]
+file_path = "../game/default.xex"
+out_directory_path = "../generated/default"
+includes = ["aot_rexglue_overrides.toml"]
