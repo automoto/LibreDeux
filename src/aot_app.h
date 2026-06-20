@@ -6,6 +6,7 @@
 #pragma once
 
 #include "crash_dump.h"
+#include "aot_xam_coop.h"
 #include "generated/default/aot_init.h"
 
 #include <filesystem>
@@ -68,6 +69,8 @@ class AotApp : public rex::ReXApp {
       config.audio_factory = REX_AUDIO_BACKEND(rex::audio::nop::NopAudioSystem);
       REXLOG_INFO("Libre Army of Two: using NOP audio backend for triage");
     }
+
+    AotInstallLocalCoopHooks(config);
   }
 
   void OnPostSetup() override {

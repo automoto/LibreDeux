@@ -22,6 +22,7 @@ include(generated/default/sources.cmake)
 
 set(AOT_SOURCES
     src/aot_app.cpp
+    src/aot_xam_coop.cpp
     src/crash_dump.cpp
     src/main.cpp
     ${GENERATED_SOURCES}

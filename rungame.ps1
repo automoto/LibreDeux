@@ -13,6 +13,12 @@
 
 .EXAMPLE
     .\rungame.ps1 -Vulkan -StopExisting
+
+.EXAMPLE
+    .\rungame.ps1 -XInput -LocalCoop -CoopTrace -StopExisting
+
+.EXAMPLE
+    .\rungame.ps1 -XInput -LocalCoop -CoopTrace -GuideButton -StopExisting
 #>
 
 [CmdletBinding()]
@@ -24,6 +30,9 @@ param(
     [switch]$Regenerate,
     [switch]$Keyboard,
     [switch]$XInput,
+    [switch]$LocalCoop,
+    [switch]$CoopTrace,
+    [switch]$GuideButton,
     [switch]$D3D12,
     [switch]$Vulkan,
     [switch]$VerboseProbe,
@@ -127,6 +136,15 @@ if ($Keyboard -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "
 }
 if ($XInput -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--input_backend")) {
     $launchArgs += "--input_backend=xinput"
+}
+if ($LocalCoop -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--aot_coop_local")) {
+    $launchArgs += "--aot_coop_local"
+}
+if ($CoopTrace -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--aot_trace_xam")) {
+    $launchArgs += "--aot_trace_xam"
+}
+if ($GuideButton -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--guide_button")) {
+    $launchArgs += "--guide_button"
 }
 if ($D3D12 -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--aot_graphics_backend")) {
     $launchArgs += "--aot_graphics_backend=d3d12"
