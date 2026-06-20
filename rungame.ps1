@@ -10,6 +10,9 @@
 
 .EXAMPLE
     .\rungame.ps1 -Build -StopExisting
+
+.EXAMPLE
+    .\rungame.ps1 -Vulkan -StopExisting
 #>
 
 [CmdletBinding()]
@@ -21,6 +24,8 @@ param(
     [switch]$Regenerate,
     [switch]$Keyboard,
     [switch]$XInput,
+    [switch]$D3D12,
+    [switch]$Vulkan,
     [switch]$VerboseProbe,
     [switch]$Wait,
     [switch]$DryRun,
@@ -112,12 +117,22 @@ $gameRootPath = Resolve-RepoPath $GameRoot
 $logsDir = Join-Path (Split-Path -Parent $exe) "logs"
 $normalizedExtraArgs = Normalize-ExtraArgs $ExtraArgs
 
+if ($D3D12 -and $Vulkan) {
+    throw "Choose only one graphics backend switch: -D3D12 or -Vulkan."
+}
+
 $launchArgs = @("--game_data_root=$gameRootPath")
 if ($Keyboard -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--mnk_mode")) {
     $launchArgs += "--mnk_mode"
 }
 if ($XInput -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--input_backend")) {
     $launchArgs += "--input_backend=xinput"
+}
+if ($D3D12 -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--aot_graphics_backend")) {
+    $launchArgs += "--aot_graphics_backend=d3d12"
+}
+if ($Vulkan -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--aot_graphics_backend")) {
+    $launchArgs += "--aot_graphics_backend=vulkan"
 }
 if ($VerboseProbe) {
     $launchArgs += @(

@@ -5,17 +5,32 @@
 
 #pragma once
 
+#include "crash_dump.h"
 #include "generated/default/aot_init.h"
 
+#include <filesystem>
+#include <fstream>
 #include <memory>
+#include <string>
 
 #include <rex/audio/nop/nop_audio_system.h>
 #include <rex/cvar.h>
+#if REX_HAS_D3D12
+#include <rex/graphics/d3d12/graphics_system.h>
+#endif
+#if REX_HAS_VULKAN
+#include <rex/graphics/vulkan/graphics_system.h>
+#endif
+#include <rex/filesystem/devices/host_path_device.h>
+#include <rex/filesystem/vfs.h>
 #include <rex/logging.h>
 #include <rex/rex_app.h>
 #include <rex/runtime.h>
 
 REXCVAR_DECLARE(bool, aot_nop_audio);
+REXCVAR_DECLARE(bool, aot_mount_shaderdumpxe);
+REXCVAR_DECLARE(bool, aot_seed_shader_compare_backend);
+REXCVAR_DECLARE(std::string, aot_graphics_backend);
 
 class AotApp : public rex::ReXApp {
  public:
@@ -27,15 +42,69 @@ class AotApp : public rex::ReXApp {
   }
 
   void OnPostInitLogging() override {
+    AotInstallCrashDumpHandler();
     REXLOG_INFO("Libre Army of Two: official ReXGlue app initialized");
   }
 
   void OnPreSetup(rex::RuntimeConfig& config) override {
-    if (!REXCVAR_GET(aot_nop_audio)) {
+    const auto& graphics_backend = REXCVAR_GET(aot_graphics_backend);
+    if (graphics_backend == "d3d12") {
+#if REX_HAS_D3D12
+      config.graphics = REX_GRAPHICS_BACKEND(rex::graphics::d3d12::D3D12GraphicsSystem);
+      REXLOG_INFO("Libre Army of Two: forcing Direct3D 12 graphics backend");
+#else
+      REXLOG_WARN("Libre Army of Two: Direct3D 12 backend was requested but is unavailable");
+#endif
+    } else if (graphics_backend == "vulkan") {
+#if REX_HAS_VULKAN
+      config.graphics = REX_GRAPHICS_BACKEND(rex::graphics::vulkan::VulkanGraphicsSystem);
+      REXLOG_INFO("Libre Army of Two: forcing Vulkan graphics backend");
+#else
+      REXLOG_WARN("Libre Army of Two: Vulkan backend was requested but is unavailable");
+#endif
+    }
+
+    if (REXCVAR_GET(aot_nop_audio)) {
+      config.audio_factory = REX_AUDIO_BACKEND(rex::audio::nop::NopAudioSystem);
+      REXLOG_INFO("Libre Army of Two: using NOP audio backend for triage");
+    }
+  }
+
+  void OnPostSetup() override {
+    if (!REXCVAR_GET(aot_mount_shaderdumpxe) || !runtime() || !runtime()->file_system()) {
       return;
     }
 
-    config.audio_factory = REX_AUDIO_BACKEND(rex::audio::nop::NopAudioSystem);
-    REXLOG_INFO("Libre Army of Two: using NOP audio backend for triage");
+    auto shader_dump_root = cache_root() / "shaderdumpxe";
+    if (REXCVAR_GET(aot_seed_shader_compare_backend)) {
+      std::error_code ec;
+      std::filesystem::create_directories(shader_dump_root, ec);
+      if (ec) {
+        REXLOG_WARN("Libre Army of Two: failed to create ShaderDumpxe cache {}: {}",
+                    shader_dump_root.string(), ec.message());
+      } else {
+        auto compare_backends = shader_dump_root / "CompareBackEnds";
+        if (!std::filesystem::exists(compare_backends, ec)) {
+          std::ofstream(compare_backends, std::ios::binary).close();
+        }
+        if (ec) {
+          REXLOG_WARN("Libre Army of Two: failed to probe ShaderDumpxe stub {}: {}",
+                      compare_backends.string(), ec.message());
+        }
+      }
+    }
+
+    auto device = std::make_unique<rex::filesystem::HostPathDevice>(
+        "\\Device\\ShaderDumpxe", shader_dump_root, false);
+    if (!device->Initialize()) {
+      REXLOG_WARN("Libre Army of Two: failed to initialize ShaderDumpxe device at {}",
+                  shader_dump_root.string());
+      return;
+    }
+
+    auto* file_system = runtime()->file_system();
+    file_system->RegisterDevice(std::move(device));
+    file_system->RegisterSymbolicLink("ShaderDumpxe:", "\\Device\\ShaderDumpxe");
+    REXLOG_INFO("Libre Army of Two: mounted {} as ShaderDumpxe:", shader_dump_root.string());
   }
 };

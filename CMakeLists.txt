@@ -22,6 +22,7 @@ include(generated/default/sources.cmake)
 
 set(AOT_SOURCES
     src/aot_app.cpp
+    src/crash_dump.cpp
     src/main.cpp
     ${GENERATED_SOURCES}
 )
@@ -38,6 +39,9 @@ target_include_directories(aot PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/generated/default
 )
 target_link_libraries(aot PRIVATE rex::runtime)
+if(WIN32)
+    target_link_libraries(aot PRIVATE dbghelp)
+endif()
 rexglue_configure_target(aot)
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/dll_targets.cmake")

@@ -38,7 +38,9 @@ powershell -ExecutionPolicy Bypass -File .\rungame.ps1 -StopExisting
 
 ## Current Status
 
-Scaffold, legal local extraction, official ReXGlue code generation, and host build are working locally. First boot creates a window and reaches early guest startup before an access violation; see `docs/status.md` for the current triage notes.
+Scaffold, legal local extraction, official ReXGlue code generation, and host
+build are working locally. The current build boots into the visible main menu;
+see `docs/status.md` for proof artifacts and `plan.md` for the gameplay plan.
 
 ## Repo Map
 
