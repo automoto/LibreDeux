@@ -2,6 +2,7 @@
 
 #include "generated/default/aot_init.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstdint>
@@ -64,6 +65,10 @@ struct HostMovieFrame {
 };
 HostMovieFrame g_movie;
 
+// HBINK of the active movie, captured on the movie thread in the sub_8308E368
+// override and consumed by the sub_824B5EA8 override (same thread).
+uint32_t g_hbink = 0;
+
 // HBINK layout (see docs/fix-movies.md): FrameBuffers* at +0xB8.
 // BINKFRAMEBUFFERS: TotalFrames +0x00, YABufferWidth +0x04, YABufferHeight +0x08,
 // cRcBBufferWidth +0x0C, cRcBBufferHeight +0x10, FrameNum(current index) +0x14,
@@ -81,14 +86,13 @@ void PublishMovieFrame(uint8_t* base, uint32_t hbink) {
   if (w < 1024 || h < 576 || total == 0 || total > 8) {
     return;
   }
-  uint32_t cur = GuestLoadU32(base, fb + 0x14);  // BINKFRAMEBUFFERS current buffer index
+  const uint32_t cw = GuestLoadU32(base, fb + 0x0C);  // cRcBBufferWidth
+  const uint32_t chh = GuestLoadU32(base, fb + 0x10);  // cRcBBufferHeight
+  uint32_t cur = GuestLoadU32(base, fb + 0x14);        // index Bink is decoding into
   if (cur >= total) {
     cur = 0;
   }
-  // KNOWN ISSUE: a fixed vertical band shows green because the chroma planes are
-  // not fully decoded for one worker-thread strip at this read point (the async
-  // multithreaded decode hasn't finished that strip). Reading the current buffer
-  // or the previous buffer both still show it. See docs/fix-movies.md "Next steps".
+
   const uint32_t frame = fb + 0x18 + cur * 0x30;
   const uint32_t y_buf = GuestLoadU32(base, frame + 0x04);
   const uint32_t y_pitch = GuestLoadU32(base, frame + 0x08);
@@ -96,28 +100,137 @@ void PublishMovieFrame(uint8_t* base, uint32_t hbink) {
   const uint32_t cr_pitch = GuestLoadU32(base, frame + 0x14);
   const uint32_t cb_buf = GuestLoadU32(base, frame + 0x1C);  // Cb (U)
   const uint32_t cb_pitch = GuestLoadU32(base, frame + 0x20);
-  if (!y_buf || !cr_buf || !cb_buf || !y_pitch || !cr_pitch || !cb_pitch) {
+  if (!y_buf || !cr_buf || !cb_buf || !y_pitch || !cr_pitch || !cb_pitch || !cw || !chh) {
     return;
   }
 
-  // Convert BT.601 limited-range YUV420 -> RGBA on this (movie) thread.
+  const uint8_t* Y = base + y_buf;
+  const uint8_t* U = base + cb_buf;  // Cb
+  const uint8_t* V = base + cr_buf;  // Cr
+
+  // One Bink decode worker's chroma comes out near-zero under ReXGlue over a
+  // fixed region (a green band/strip; luma is fine). A chroma pixel is "dead" when
+  // U and V are both well below neutral (which renders green). Repair into fixed
+  // half-res chroma planes: first fill dead pixels horizontally from the nearest
+  // good pixel in the row; then fill mostly-dead rows vertically from the nearest
+  // good row (so a fully-dead top/bottom strip gets chroma from a good row). If the
+  // whole frame is dead (a torn/transition frame), skip and keep the previous.
+  static std::vector<uint8_t> uf, vf;  // fixed chroma planes, cw*chh
+  static std::vector<uint32_t> row_dead;
+  uf.resize(static_cast<size_t>(cw) * chh);
+  vf.resize(static_cast<size_t>(cw) * chh);
+  row_dead.resize(chh);
+  auto dead_at = [&](const uint8_t* us, const uint8_t* vs, uint32_t x) {
+    return us[x] < 64 && vs[x] < 64;  // both far below neutral(128) => artifact green
+  };
+  uint64_t dead_px = 0;
+  for (uint32_t r = 0; r < chh; ++r) {
+    const uint8_t* us = U + static_cast<size_t>(r) * cb_pitch;
+    const uint8_t* vs = V + static_cast<size_t>(r) * cr_pitch;
+    uint8_t* ud = uf.data() + static_cast<size_t>(r) * cw;
+    uint8_t* vd = vf.data() + static_cast<size_t>(r) * cw;
+    uint32_t rdead = 0;
+    int first_good = -1;
+    for (uint32_t x = 0; x < cw; ++x) {
+      if (!dead_at(us, vs, x)) {
+        first_good = static_cast<int>(x);
+        break;
+      }
+    }
+    if (first_good < 0) {  // whole row dead -> mark; fixed by the vertical pass
+      std::memset(ud, 128, cw);
+      std::memset(vd, 128, cw);
+      row_dead[r] = cw;
+      dead_px += cw;
+      continue;
+    }
+    for (int x = 0; x < first_good; ++x) {  // leading dead run
+      ud[x] = us[first_good];
+      vd[x] = vs[first_good];
+      ++rdead;
+    }
+    int last = first_good;
+    for (uint32_t x = static_cast<uint32_t>(first_good); x < cw; ++x) {
+      if (!dead_at(us, vs, x)) {
+        ud[x] = us[x];
+        vd[x] = vs[x];
+        last = static_cast<int>(x);
+      } else {
+        ud[x] = ud[last];
+        vd[x] = vd[last];
+        ++rdead;
+      }
+    }
+    row_dead[r] = rdead;
+    dead_px += rdead;
+  }
+  // Vertical fill: replace mostly-dead rows with the nearest good row's chroma.
+  {
+    const uint32_t good_thresh = cw / 4;
+    static std::vector<int> above, below;
+    above.resize(chh);
+    below.resize(chh);
+    int g = -1;
+    for (uint32_t r = 0; r < chh; ++r) {
+      if (row_dead[r] <= good_thresh) g = static_cast<int>(r);
+      above[r] = g;
+    }
+    g = -1;
+    for (uint32_t r = chh; r-- > 0;) {
+      if (row_dead[r] <= good_thresh) g = static_cast<int>(r);
+      below[r] = g;
+    }
+    for (uint32_t r = 0; r < chh; ++r) {
+      if (row_dead[r] <= cw / 2) {
+        continue;  // row is mostly good (horizontal fill already handled it)
+      }
+      int src = -1;
+      if (above[r] < 0) {
+        src = below[r];
+      } else if (below[r] < 0) {
+        src = above[r];
+      } else {
+        src = (r - static_cast<uint32_t>(above[r]) <= static_cast<uint32_t>(below[r]) - r)
+                  ? above[r]
+                  : below[r];
+      }
+      if (src >= 0) {
+        std::memcpy(uf.data() + static_cast<size_t>(r) * cw,
+                    uf.data() + static_cast<size_t>(src) * cw, cw);
+        std::memcpy(vf.data() + static_cast<size_t>(r) * cw,
+                    vf.data() + static_cast<size_t>(src) * cw, cw);
+      }
+    }
+  }
+  if (dead_px > (static_cast<uint64_t>(cw) * chh) / 2) {
+    return;  // mostly-dead frame => keep the previous good frame
+  }
+
+  // Convert BT.601 limited-range YUV420 -> RGBA using the repaired chroma planes.
   static std::vector<uint8_t> scratch;
   scratch.resize(static_cast<size_t>(w) * h * 4);
-  const uint8_t* Y = base + y_buf;
-  const uint8_t* V = base + cr_buf;
-  const uint8_t* U = base + cb_buf;
   for (uint32_t y = 0; y < h; ++y) {
     const uint8_t* yr = Y + static_cast<size_t>(y) * y_pitch;
-    const uint8_t* ur = U + static_cast<size_t>(y >> 1) * cb_pitch;
-    const uint8_t* vr = V + static_cast<size_t>(y >> 1) * cr_pitch;
+    const uint8_t* ur = uf.data() + static_cast<size_t>(y >> 1) * cw;
+    const uint8_t* vr = vf.data() + static_cast<size_t>(y >> 1) * cw;
     uint8_t* out = scratch.data() + static_cast<size_t>(y) * w * 4;
     for (uint32_t x = 0; x < w; ++x) {
+      const uint32_t cc = x >> 1;
       const int c = static_cast<int>(yr[x]) - 16;
-      const int d = static_cast<int>(ur[x >> 1]) - 128;
-      const int e = static_cast<int>(vr[x >> 1]) - 128;
-      out[0] = ClampU8((298 * c + 409 * e + 128) >> 8);
-      out[1] = ClampU8((298 * c - 100 * d - 208 * e + 128) >> 8);
-      out[2] = ClampU8((298 * c + 516 * d + 128) >> 8);
+      const int d = static_cast<int>(ur[cc]) - 128;
+      const int e = static_cast<int>(vr[cc]) - 128;
+      int R = ClampU8((298 * c + 409 * e + 128) >> 8);
+      int G = ClampU8((298 * c - 100 * d - 208 * e + 128) >> 8);
+      int B = ClampU8((298 * c + 516 * d + 128) >> 8);
+      // Final guard: the decode-artifact colour is a strong green (chroma ~0 ->
+      // G dominates R and B). Detect green dominance in the output and render
+      // neutral grey (luma) instead, so no green survives at any brightness.
+      if (G > R + 40 && G > B + 40 && R < 110 && B < 110) {
+        R = G = B = ClampU8((298 * c + 128) >> 8);
+      }
+      out[0] = static_cast<uint8_t>(R);
+      out[1] = static_cast<uint8_t>(G);
+      out[2] = static_cast<uint8_t>(B);
       out[3] = 255;
       out += 4;
     }
@@ -166,9 +279,19 @@ class MovieOverlayDialog : public rex::ui::ImGuiDialog {
       ++stall_;
     }
     const bool live = seq != 0 && stall_ < 8;
-    if (live && texture_) {
+    if (live && texture_ && tw_ > 0 && th_ > 0) {
+      // Draw aspect-correct (letterboxed), centered in the window, instead of
+      // stretching to the full surface (which distorts non-16:9 windows).
+      const float dw = io.DisplaySize.x;
+      const float dh = io.DisplaySize.y;
+      const float scale =
+          std::min(dw / static_cast<float>(tw_), dh / static_cast<float>(th_));
+      const float fw = static_cast<float>(tw_) * scale;
+      const float fh = static_cast<float>(th_) * scale;
+      const float x0 = (dw - fw) * 0.5f;
+      const float y0 = (dh - fh) * 0.5f;
       ImGui::GetBackgroundDrawList()->AddImage(reinterpret_cast<ImTextureID>(texture_.get()),
-                                               ImVec2(0.0f, 0.0f), io.DisplaySize);
+                                               ImVec2(x0, y0), ImVec2(x0 + fw, y0 + fh));
     }
   }
 
@@ -266,21 +389,30 @@ void AotCreateMovieOverlay(rex::ui::ImGuiDrawer* drawer, rex::ui::ImmediateDrawe
   REXLOG_INFO("Libre Army of Two: host movie overlay installed");
 }
 
-// --- Bink internal-function override (weak-alias strong definition) -----------
-// `sub_8308E368` is the per-frame Bink service call (HBINK in r3). The recompiler
-// emits `sub_8308E368` as a weak alias to the real body `__imp__sub_8308E368`;
-// defining it strongly here intercepts all direct calls. We run the original
-// (which advances decode/audio/timing), then publish the freshly decoded frame.
+// --- Bink internal-function overrides (weak-alias strong definitions) ---------
+// The recompiler emits each internal function `sub_XXXX` as a weak alias to its
+// real body `__imp__sub_XXXX`; defining `sub_XXXX` strongly here intercepts all
+// direct calls. We call the original, then do our work.
+//
+// `sub_8308E368` is Bink's per-frame service call (HBINK in r3) but it runs
+// *inside* the multithreaded decode/wait loop, so the planes are not yet complete
+// there (reading them caused the green chroma band). We use it only to capture the
+// HBINK pointer. `sub_824B5EA8` is the outer UCodecMovieBink::service whose loop
+// returns only once decode is complete — we publish the finished frame there.
 extern "C" {
 void __imp__sub_8308E368(PPCContext& ctx, uint8_t* base);
+void __imp__sub_824B5EA8(PPCContext& ctx, uint8_t* base);
 }
 
 void sub_8308E368(PPCContext& ctx, uint8_t* base) {
-  const uint32_t hbink = ctx.r3.u32;
+  g_hbink = ctx.r3.u32;  // HBINK; captured for the post-loop publish below
   __imp__sub_8308E368(ctx, base);
-  // PublishMovieFrame reads the buffer NOT currently being decoded (the stable
-  // previous frame), to avoid the async decoder's half-written current buffer.
-  if (hbink && REXCVAR_GET(aot_host_movies)) {
-    PublishMovieFrame(base, hbink);
+}
+
+void sub_824B5EA8(PPCContext& ctx, uint8_t* base) {
+  __imp__sub_824B5EA8(ctx, base);  // runs the full per-frame decode + wait loop
+  // The decode loop has completed, so the frame buffers are now stable.
+  if (g_hbink && REXCVAR_GET(aot_host_movies)) {
+    PublishMovieFrame(base, g_hbink);
   }
 }

@@ -19,20 +19,28 @@ game's own working path. Implemented in `src/aot_bink_shim.cpp`; toggle with cva
 
 ## How the fix works
 
-1. **Hook the per-frame Bink call** `sub_8308E368` (the `UCodecMovieBink` service
-   call; `HBINK` in r3). It's an internal recompiled function, so it's overridden
-   via the **weak-alias** trick: define a strong `sub_8308E368` that calls the real
-   body `__imp__sub_8308E368`, then reads the decoded planes. (Patching
-   `PPCFuncMappings` does *not* work for internal functions — that only intercepts
-   indirect/import-thunk calls, which is why the `NtCreateFile`/`NtOpenFile` open
-   trace can use it but the Bink calls cannot.)
-2. **Read the planes** from `HBINK → BINKFRAMEBUFFERS` (layout below), convert
-   BT.601 limited-range YUV420 → RGBA on the movie thread, hand off to the UI
-   thread under a mutex.
-3. **Draw** the latest frame fullscreen via an `ImGuiDialog` overlay
+Internal recompiled functions are overridden via the **weak-alias** trick: define
+a strong `sub_XXXX` that calls the real body `__imp__sub_XXXX`. (Patching
+`PPCFuncMappings` does *not* work for internal functions — it only intercepts
+indirect/import-thunk calls, which is why the `NtCreateFile`/`NtOpenFile` open
+trace can use it but the Bink calls cannot.)
+
+1. **Capture HBINK** in a `sub_8308E368` override (the per-frame Bink call; `HBINK`
+   in r3). This call runs *inside* the async decode/wait loop, so it is used only
+   to record the handle, not to read planes.
+2. **Publish after the decode completes** in a `sub_824B5EA8` override (the outer
+   `UCodecMovieBink` service): call the original (its loop finishes the frame), then
+   read the planes. (Reading inside `sub_8308E368` raced the decode workers.)
+3. **Read + repair + convert** in `PublishMovieFrame`: read `HBINK →
+   BINKFRAMEBUFFERS` (layout below); the broken decode strip leaves chroma at ~0
+   (renders green), so repair it — fill dead chroma pixels horizontally from the
+   nearest good pixel, then fill mostly-dead rows vertically from the nearest good
+   row; a final output guard turns any residual green pixel grey. Convert BT.601
+   YUV420 → RGBA on the movie thread; hand off to the UI thread under a mutex.
+4. **Draw** the latest frame via an `ImGuiDialog` overlay
    (`ImGui::GetBackgroundDrawList()->AddImage`), created in
-   `AotApp::OnCreateDialogs`. Only fullscreen movies (≥1024×576) are presented; the
-   small 100×100 `LoadingCoin*` UI loops are skipped.
+   `AotApp::OnCreateDialogs`, aspect-correct (letterboxed/centered). Only fullscreen
+   movies (≥1024×576) are presented; the 100×100 `LoadingCoin*` UI loops are skipped.
 
 ## Reverse-engineering reference (verified against the running game)
 
@@ -41,8 +49,9 @@ game's own working path. Implemented in `src/aot_bink_shim.cpp`; toggle with cva
 - Bink library is linked at ~`0x8308xxxx`; async decode workers at
   ~`0x82422000–0x82599000`. `.bik` files open on a worker thread.
 - `sub_8308C518` = BinkOpen core (returns `HBINK` in r3).
-- `sub_8308E368` = per-frame service call (the host hook point).
-- `UCodecMovieBink` service method = `sub_824B5EA8` (in `aot_recomp.20.cpp`).
+- `sub_8308E368` = per-frame Bink call inside the decode loop (used to capture HBINK).
+- `sub_824B5EA8` = `UCodecMovieBink` service (in `aot_recomp.20.cpp`); its loop
+  returns once decode is complete — the host frame is published here.
 
 `HBINK` (big-endian): `+0x00` Width, `+0x04` Height, `+0x08` Frames,
 `+0x0C` FrameNum, `+0x10` LastFrameNum, `+0x14`/`+0x18` frame-rate num/den,
@@ -71,29 +80,33 @@ Planes live in the `0xFFxxxxxx` physical/GPU window. (cR=Cr/V, cB=Cb/U.)
   deep, multi-layer GPU-translation effort, so we pivoted to the host overlay (B).
   That SDK experiment was **reverted** — the shipped fix needs no SDK changes.
 
-## Known issues
+## Status & known issues
 
-- **Green vertical band** on fullscreen movies: at the read point one async-decode
-  worker strip's *chroma* isn't finished (luma is fine, U/V≈0 → green). Reading the
-  current or previous frame buffer both still catch it.
+Movies now **play with correct video** (the main green band is fixed by the chroma
+repair; verified on screen via the EA/Army-of-Two logos). Remaining, minor:
+
+- **Small flashing green bar at the very top edge** (1–2 px). The top chroma rows
+  are dead and the repair/guard don't fully catch this thin edge every frame.
+  Cosmetic; tracked as a follow-up.
+- Possible slight **offset** reported during early iterations — not reproduced in
+  the final full-res pipeline dumps (content was centred); re-check on a cutscene.
 - Cutscene **subtitles are covered** by the fullscreen overlay (the game draws them
   into the black guest frame). Logos have no subtitles.
-- No letterbox (stretches to window); the overlay texture is recreated each frame.
-- `LoadingCoin*` UI loops stay black (not host-presented).
+- **Perf:** the overlay recreates its `ImmediateTexture` every frame, and the
+  overlay/compositing path runs whenever a movie is active.
+- `LoadingCoin*` UI loops stay black (not host-presented; not fullscreen).
 
-## Next steps
+## Next steps (follow-ups)
 
-1. **Green band — read a complete frame.** Find the true "decode complete" sync
-   point and read there. Candidates around the service loop in `sub_824B5EA8`:
-   the post-loop `sub_8308DE38`, or `sub_8308E968`/`sub_8308D628` — instrument to
-   see which returns only after all worker strips finish. Fallbacks:
-   - *Detect-and-skip:* if the chroma has a contiguous ~0 column band, the frame is
-     incomplete — keep the previous published frame (worst case repeats a frame).
-   - *Column-merge:* fill ~0-chroma columns from the other (complete) buffer.
-2. **Aspect ratio:** letterbox 16:9 instead of stretching.
-3. **Perf:** reuse one `ImmediateTexture` (update in place); only run the overlay
-   while a fullscreen movie is active.
-4. **Optional:** present the `yuva420p` UI loops too (needs their on-screen rect).
+1. **Top green bar:** clamp/repair the top 1–2 chroma rows specifically (e.g.
+   vertical-fill the first good row into the top rows, or widen the dead test for
+   the top edge). Minor.
+2. **Perf:** reuse one `ImmediateTexture` (update in place) instead of recreating
+   per frame; only engage the overlay while a fullscreen movie is active.
+3. **Subtitles:** for cutscenes, find a way to keep the game's subtitle pass
+   visible over the overlay (or composite under it).
+4. **Offset:** confirm whether any real offset remains on a cutscene.
+5. **Optional:** present the `yuva420p` UI loops too (needs their on-screen rect).
 
 ## Repos to update — no ReXGlue fork
 
