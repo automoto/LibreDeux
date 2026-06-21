@@ -47,8 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\rungame.ps1 -XInput -LocalCoop -StopE
 Scaffold, legal local extraction, official ReXGlue code generation, and host
 build are working locally. The current build boots into the visible main menu,
 reaches single-player gameplay, and supports local split-screen co-op with two
-XInput controllers; see `plan.md` for the gameplay plan and `local-coop.md` for
-the co-op notes.
+XInput controllers;
 
 ## Repo Map
 

@@ -206,7 +206,17 @@ void PublishMovieFrame(uint8_t* base, uint32_t hbink) {
     return;  // mostly-dead frame => keep the previous good frame
   }
 
-  // Convert BT.601 limited-range YUV420 -> RGBA using the repaired chroma planes.
+  // Under ReXGlue the decoded picture comes out wrapped horizontally: each plane
+  // row is cyclically rotated to the right, so the right edge appears at the left
+  // (verified on the EA / Army-of-Two logos against an ffmpeg reference decode of
+  // the same .bik). The luma rotation equals twice the chroma-plane pitch padding
+  // (cr_pitch - cw); chroma is rotated by that padding directly. Undo the wrap by
+  // sampling each source column at (x + x_wrap) mod w. (cr_pitch - cw == 128 here,
+  // so the luma picture is shifted right by 256 px in a 1280-wide frame.)
+  const uint32_t x_wrap = ((cr_pitch > cw ? (cr_pitch - cw) : 0u) * 2u) % (w ? w : 1u);
+
+  // Convert BT.601 limited-range YUV420 -> RGBA using the repaired chroma planes,
+  // un-wrapping the horizontal shift as we sample each source column.
   static std::vector<uint8_t> scratch;
   scratch.resize(static_cast<size_t>(w) * h * 4);
   for (uint32_t y = 0; y < h; ++y) {
@@ -215,8 +225,9 @@ void PublishMovieFrame(uint8_t* base, uint32_t hbink) {
     const uint8_t* vr = vf.data() + static_cast<size_t>(y >> 1) * cw;
     uint8_t* out = scratch.data() + static_cast<size_t>(y) * w * 4;
     for (uint32_t x = 0; x < w; ++x) {
-      const uint32_t cc = x >> 1;
-      const int c = static_cast<int>(yr[x]) - 16;
+      const uint32_t sx = (x + x_wrap) % w;  // un-wrap the horizontal rotation
+      const uint32_t cc = sx >> 1;
+      const int c = static_cast<int>(yr[sx]) - 16;
       const int d = static_cast<int>(ur[cc]) - 128;
       const int e = static_cast<int>(vr[cc]) - 128;
       int R = ClampU8((298 * c + 409 * e + 128) >> 8);

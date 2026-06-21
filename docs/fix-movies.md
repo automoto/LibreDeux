@@ -88,8 +88,11 @@ repair; verified on screen via the EA/Army-of-Two logos). Remaining, minor:
 - **Small flashing green bar at the very top edge** (1–2 px). The top chroma rows
   are dead and the repair/guard don't fully catch this thin edge every frame.
   Cosmetic; tracked as a follow-up.
-- Possible slight **offset** reported during early iterations — not reproduced in
-  the final full-res pipeline dumps (content was centred); re-check on a cutscene.
+- ~~Possible slight **offset** reported during early iterations~~ **Fixed.** The
+  decoded plane rows come out of Bink **cyclically rotated right** (256 px luma /
+  128 px chroma for the 1280×720 clips), so the right edge wrapped into the left.
+  The converter now un-wraps by sampling source column `(x + x_wrap) mod w`, with
+  `x_wrap = 2 * (cr_pitch - cw)`. See [offset-bug-fix.md](offset-bug-fix.md).
 - Cutscene **subtitles are covered** by the fullscreen overlay (the game draws them
   into the black guest frame). Logos have no subtitles.
 - **Perf:** the overlay recreates its `ImmediateTexture` every frame, and the
@@ -105,7 +108,8 @@ repair; verified on screen via the EA/Army-of-Two logos). Remaining, minor:
    per frame; only engage the overlay while a fullscreen movie is active.
 3. **Subtitles:** for cutscenes, find a way to keep the game's subtitle pass
    visible over the overlay (or composite under it).
-4. **Offset:** confirm whether any real offset remains on a cutscene.
+4. ~~**Offset:** confirm whether any real offset remains on a cutscene.~~ Done —
+   fixed by using the `HBINK` display Width/Height (see above).
 5. **Optional:** present the `yuva420p` UI loops too (needs their on-screen rect).
 
 ## Repos to update — no ReXGlue fork
