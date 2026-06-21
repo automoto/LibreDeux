@@ -15,7 +15,7 @@
     .\rungame.ps1 -Vulkan -StopExisting
 
 .EXAMPLE
-    .\rungame.ps1 -XInput -LocalCoop -CoopTrace -StopExisting
+    .\rungame.ps1 -XInput -LocalCoop -StopExisting
 
 .EXAMPLE
     .\rungame.ps1 -XInput -LocalCoop -CoopTrace -GuideButton -StopExisting

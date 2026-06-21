@@ -4,6 +4,7 @@ param(
     [string]$RexGluePrefix = "tools\rexglue-sdk\out\install\win-amd64-nmake",
     [string]$CompilerFlags = "-mssse3",
     [switch]$Regenerate,
+    [switch]$SkipGeneratedWorkarounds,
     [switch]$Configure
 )
 
@@ -51,6 +52,16 @@ if ($Regenerate) {
     & $rexglueExe codegen $manifest
     if ($LASTEXITCODE -ne 0) {
         throw "ReXGlue codegen failed with exit code $LASTEXITCODE"
+    }
+
+    if (-not $SkipGeneratedWorkarounds) {
+        $generatedWorkarounds = Join-Path $PSScriptRoot "apply-aot-generated-workarounds.ps1"
+        if (Test-Path -LiteralPath $generatedWorkarounds) {
+            & $generatedWorkarounds -Root $repoRoot
+            if ($LASTEXITCODE -ne 0) {
+                throw "Generated workaround patch failed with exit code $LASTEXITCODE"
+            }
+        }
     }
 }
 
