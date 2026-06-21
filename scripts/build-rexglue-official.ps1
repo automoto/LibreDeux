@@ -58,12 +58,15 @@ if (Test-Path -LiteralPath $repairScript) {
     }
 }
 
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 $remote = & git -C $sourcePath remote get-url origin 2>$null
-if ($LASTEXITCODE -eq 0 -and $remote -and $remote -notmatch "rexglue[/\\]rexglue-sdk(\.git)?$") {
+$remoteExitCode = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorActionPreference
+if ($remoteExitCode -eq 0 -and $remote -and $remote -notmatch "rexglue[/\\]rexglue-sdk(\.git)?$") {
     Write-Warning "ReXGlue origin is '$remote'. This project expects the official rexglue/rexglue-sdk repository unless a fork becomes necessary."
 }
 
-$previousErrorActionPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 $envLines = cmd.exe /d /c "`"$vcvars`" x64 >nul && set" 2>&1
 $ErrorActionPreference = $previousErrorActionPreference

@@ -28,6 +28,9 @@ $manifest = Resolve-RepoPath "config\aot_manifest.toml"
 $gameXex = Resolve-RepoPath "game\default.xex"
 $rexgluePrefixPath = Resolve-RepoPath $RexGluePrefix
 $rexglueExe = Join-Path $rexgluePrefixPath "bin\rexglue.exe"
+$rexglueCmakeDir = Join-Path $rexgluePrefixPath "lib\cmake\rexglue"
+$cmakeRexGluePrefixPath = $rexgluePrefixPath.Replace("\", "/")
+$cmakeRexGlueDir = $rexglueCmakeDir.Replace("\", "/")
 $clang = "C:\Program Files\LLVM\bin\clang.exe"
 $clangxx = "C:\Program Files\LLVM\bin\clang++.exe"
 
@@ -87,7 +90,9 @@ if ($Configure -or -not (Test-Path -LiteralPath $cacheFile)) {
         "-DCMAKE_CXX_COMPILER=$clangxx" `
         "-DCMAKE_C_FLAGS=$CompilerFlags" `
         "-DCMAKE_CXX_FLAGS=$CompilerFlags" `
-        "-DCMAKE_PREFIX_PATH=$rexgluePrefixPath"
+        "-DCMAKE_PREFIX_PATH=$cmakeRexGluePrefixPath" `
+        "-Urexglue_DIR" `
+        "-Drexglue_DIR=$cmakeRexGlueDir"
     if ($LASTEXITCODE -ne 0) {
         throw "CMake configure failed with exit code $LASTEXITCODE"
     }
