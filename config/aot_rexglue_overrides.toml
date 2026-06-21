@@ -34,6 +34,9 @@ name = "sub_827D2F70"
 [functions."0x82409618"]
 name = "sub_82409618"
 
+[functions."0x82FBF028"]
+name = "sub_82FBF028"
+
 [functions."0x82FBF030"]
 name = "sub_82FBF030"
 
