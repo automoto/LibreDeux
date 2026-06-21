@@ -6,6 +6,7 @@
 #pragma once
 
 #include "crash_dump.h"
+#include "aot_bink_shim.h"
 #include "aot_xam_coop.h"
 #include "generated/default/aot_init.h"
 
@@ -71,6 +72,11 @@ class AotApp : public rex::ReXApp {
     }
 
     AotInstallLocalCoopHooks(config);
+    AotInstallBinkHooks(config);
+  }
+
+  void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {
+    AotCreateMovieOverlay(drawer, immediate_drawer());
   }
 
   void OnPostSetup() override {

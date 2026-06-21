@@ -78,3 +78,14 @@ name = "sub_82F03170"
 
 [functions."0x82F03B98"]
 name = "sub_82F03B98"
+
+# Bink movie seam (see docs/fix-movies.md). Names are documentation hints; the
+# host override is the weak-alias strong definition in src/aot_bink_shim.cpp.
+[functions."0x8308C518"]
+name = "Bink_Open_core"
+
+[functions."0x8308E368"]
+name = "Bink_ServiceFrame"
+
+[functions."0x824B5EA8"]
+name = "UCodecMovieBink_Service"
