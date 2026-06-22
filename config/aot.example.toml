@@ -1,0 +1,32 @@
+# Libre Army of Two - example configuration
+#
+# Copy this file next to the executable as "aot.toml"
+#   (e.g. build\aot-nmake-release\aot.toml)
+# to apply persistent settings without command-line flags.
+#
+# NOTE on precedence: a value set here OVERRIDES the same flag passed on the
+# command line. See docs/cli-limitation.md. If a --flag "doesn't take effect",
+# check whether it is also set in this file.
+#
+# Keys are flat and must match cvar names exactly (the TOML loader joins nested
+# tables with "_", which would not match the mixed cvar prefixes).
+
+# --- HDR readback (fixes Army of Two over-bright / washed-out rendering) -------
+# Army of Two (Unreal Engine 3) drives auto-exposure + bloom from HDR
+# eye-adaptation, which needs the GPU to read resolved luminance back to the CPU.
+# With readback off the exposure blows out. The app enables "fast" by default;
+# this knob lets you change or pin it.
+#
+#   auto  - kFast unless you set a readback cvar yourself (default behavior)
+#   fast  - kFast: reads previous frame's resolve (1-frame-delayed, cheaper)
+#   full  - kFull: immediate synchronous readback (most accurate, slower)  <-- BACKUP
+#   off   - disable readback (reproduces the over-bright bug; fastest)
+aot_hdr_readback = "fast"
+
+# BACKUP: if "fast" still looks over-bright or the exposure lags, use full:
+# aot_hdr_readback = "full"
+
+# Advanced: you can also drive the underlying SDK cvars directly instead of the
+# knob above (leave aot_hdr_readback = "auto" to defer to these):
+# readback_resolve = "full"          # none | fast | some | full
+# d3d12_readback_resolve = true      # legacy bool, maps to kFast on D3D12
