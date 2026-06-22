@@ -72,6 +72,14 @@ and HDR exposure is corrected (no more washed-out/over-bright rendering).
 
 This repo defaults to the official `rexglue/rexglue-sdk` repository at `tools\rexglue-sdk`. Do not use the 3U compatibility fork unless Army of Two proves it needs the same runtime fixes.
 
+This production release is built against **vanilla** ReXGlue, pinned to commit `e8ce24f` (tip of `main`, "Release v0.8.0", SDK version `0.8.1.4`). After cloning, check out that commit for a reproducible build:
+
+```powershell
+git -C tools\rexglue-sdk checkout e8ce24f
+```
+
+Note: the annotated `v0.8.0` tag points to an earlier commit (`2bdb97f`, version `0.8.0`); we intentionally build against `main`'s "Release v0.8.0" commit instead. The see-through-geometry occlusion fix is **not** part of this build (see Known Issues).
+
 ## Legal / Repo Hygiene
 
 Keep this repo free of game assets and generated game-derived code. See `docs/legal.md`.
