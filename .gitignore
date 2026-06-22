@@ -25,6 +25,10 @@ logs/
 *.log
 *.png
 
+# RenderDoc/PIX captures and shader dumps (debug only).
+*.rdc
+eid*.txt
+
 # CMake/build/install outputs.
 build/
 out/

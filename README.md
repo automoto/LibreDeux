@@ -47,7 +47,17 @@ powershell -ExecutionPolicy Bypass -File .\rungame.ps1 -XInput -LocalCoop -StopE
 Scaffold, legal local extraction, official ReXGlue code generation, and host
 build are working locally. The current build boots into the visible main menu,
 reaches single-player gameplay, and supports local split-screen co-op with two
-XInput controllers;
+XInput controllers. In-engine Bink movies/cutscenes play through a host overlay,
+and HDR exposure is corrected (no more washed-out/over-bright rendering).
+
+## Known Issues
+
+- **See-through geometry:** some background structures (walls, frames) can render
+  through foreground geometry instead of being occluded. This is a GPU
+  occlusion-query parity gap and is **not fixed in this release** — the production
+  build ships against vanilla ReXGlue. Root-cause analysis and a deferred,
+  SDK-side fix attempt are documented in [docs/fix-visual-bug.md](docs/fix-visual-bug.md)
+  and [docs/fix-occlusion-queries.md](docs/fix-occlusion-queries.md).
 
 ## Repo Map
 
