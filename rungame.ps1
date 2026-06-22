@@ -35,6 +35,8 @@ param(
     [switch]$GuideButton,
     [switch]$D3D12,
     [switch]$Vulkan,
+    [switch]$ReadbackFull,
+    [switch]$NoReadback,
     [switch]$VerboseProbe,
     [switch]$Wait,
     [switch]$DryRun,
@@ -130,6 +132,10 @@ if ($D3D12 -and $Vulkan) {
     throw "Choose only one graphics backend switch: -D3D12 or -Vulkan."
 }
 
+if ($ReadbackFull -and $NoReadback) {
+    throw "Choose only one HDR readback switch: -ReadbackFull or -NoReadback."
+}
+
 $launchArgs = @("--game_data_root=$gameRootPath")
 if ($Keyboard -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--mnk_mode")) {
     $launchArgs += "--mnk_mode"
@@ -151,6 +157,12 @@ if ($D3D12 -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--a
 }
 if ($Vulkan -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--aot_graphics_backend")) {
     $launchArgs += "--aot_graphics_backend=vulkan"
+}
+if ($ReadbackFull -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--aot_hdr_readback")) {
+    $launchArgs += "--aot_hdr_readback=full"
+}
+if ($NoReadback -and -not (Has-ArgPrefix -InputArgs $normalizedExtraArgs -Prefix "--aot_hdr_readback")) {
+    $launchArgs += "--aot_hdr_readback=off"
 }
 if ($VerboseProbe) {
     $launchArgs += @(

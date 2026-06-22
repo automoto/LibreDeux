@@ -10,3 +10,8 @@ REXCVAR_DEFINE_STRING(aot_graphics_backend, "auto", "AOT",
                       "Graphics backend override: auto, d3d12, vulkan")
     .allowed({"auto", "d3d12", "vulkan"})
     .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
+REXCVAR_DEFINE_STRING(aot_hdr_readback, "auto", "AOT",
+                      "HDR eye-adaptation GPU readback mode (fixes Army of Two over-bright/"
+                      "washed-out rendering): auto (kFast unless overridden), fast, full, off")
+    .allowed({"auto", "fast", "full", "off"})
+    .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);

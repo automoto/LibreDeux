@@ -33,6 +33,7 @@ REXCVAR_DECLARE(bool, aot_nop_audio);
 REXCVAR_DECLARE(bool, aot_mount_shaderdumpxe);
 REXCVAR_DECLARE(bool, aot_seed_shader_compare_backend);
 REXCVAR_DECLARE(std::string, aot_graphics_backend);
+REXCVAR_DECLARE(std::string, aot_hdr_readback);
 
 class AotApp : public rex::ReXApp {
  public:
@@ -70,6 +71,8 @@ class AotApp : public rex::ReXApp {
       config.audio_factory = REX_AUDIO_BACKEND(rex::audio::nop::NopAudioSystem);
       REXLOG_INFO("Libre Army of Two: using NOP audio backend for triage");
     }
+
+    ApplyHdrReadbackMode();
 
     AotInstallLocalCoopHooks(config);
     AotInstallBinkHooks(config);
@@ -115,5 +118,32 @@ class AotApp : public rex::ReXApp {
     file_system->RegisterDevice(std::move(device));
     file_system->RegisterSymbolicLink("ShaderDumpxe:", "\\Device\\ShaderDumpxe");
     REXLOG_INFO("Libre Army of Two: mounted {} as ShaderDumpxe:", shader_dump_root.string());
+  }
+
+ private:
+  // Army of Two (UE3) drives auto-exposure/bloom from HDR eye-adaptation, which needs GPU->CPU
+  // resolve readback. ReXGlue (like stock Xenia) ships readback-resolve disabled by default, so
+  // exposure blows out (over-bright/washed-out). Mirror Xenia's known-good fix by enabling the
+  // kFast readback path. Driven by the aot_hdr_readback enum cvar (instead of a bare
+  // HasNonDefaultValue guard) so the "off" case is detectable despite the cvar system having no
+  // source tracking - see docs/cli-limitation.md. Uses the shared readback_resolve string so it
+  // applies to both D3D12 and Vulkan. Runs in OnPreSetup, before the runtime/GPU consume it.
+  void ApplyHdrReadbackMode() {
+    const std::string& mode = REXCVAR_GET(aot_hdr_readback);
+    if (mode == "fast" || mode == "full" || mode == "off") {
+      rex::cvar::SetFlagByName("readback_resolve", mode == "off" ? "none" : mode);
+      REXLOG_INFO("Libre Army of Two: HDR readback-resolve = {} (aot_hdr_readback)", mode);
+      return;
+    }
+    // auto: enable kFast unless the user already chose a readback setting via any source.
+    if (rex::cvar::HasNonDefaultValue("readback_resolve") ||
+        rex::cvar::HasNonDefaultValue("d3d12_readback_resolve") ||
+        rex::cvar::HasNonDefaultValue("vulkan_readback_resolve")) {
+      REXLOG_INFO("Libre Army of Two: HDR readback-resolve left at user/config setting");
+      return;
+    }
+    rex::cvar::SetFlagByName("readback_resolve", "fast");
+    REXLOG_INFO("Libre Army of Two: HDR readback-resolve enabled (kFast, auto default); "
+                "override with --aot_hdr_readback=off|full");
   }
 };
