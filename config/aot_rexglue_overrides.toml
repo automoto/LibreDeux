@@ -79,13 +79,16 @@ name = "sub_82F03170"
 [functions."0x82F03B98"]
 name = "sub_82F03B98"
 
-# Bink movie seam (see docs/fix-movies.md). Names are documentation hints; the
-# host override is the weak-alias strong definition in src/aot_bink_shim.cpp.
+# Bink movie seam (see docs/fix-movies.md). 0x8308E368 and 0x824B5EA8 are
+# overridden by the weak-alias strong definitions in src/aot_bink_shim.cpp, so
+# codegen must emit them under the sub_<addr> symbol that file references (the
+# `name` field sets the emitted symbol name). 0x8308C518 is only registered for
+# readability (not overridden).
 [functions."0x8308C518"]
 name = "Bink_Open_core"
 
 [functions."0x8308E368"]
-name = "Bink_ServiceFrame"
+name = "sub_8308E368"  # Bink_ServiceFrame
 
 [functions."0x824B5EA8"]
-name = "UCodecMovieBink_Service"
+name = "sub_824B5EA8"  # UCodecMovieBink_Service

@@ -2,45 +2,23 @@
 
 ## ReXGlue SDK
 
-Use the official ReXGlue SDK repository unless Army of Two proves it needs project-specific runtime fixes.
+The official ReXGlue SDK ships as the `tools/rexglue-sdk` git submodule, pinned to commit
+`e8ce24f` (SDK `0.8.1.4`). Army of Two builds against vanilla ReXGlue.
 
-Default local layout:
+Fetch it with the repo:
 
-```text
-LibreArmyOfTwo/
-  tools/rexglue-sdk/
+```
+git clone --recurse-submodules <repo_url>
+# or, if already cloned:
+git submodule update --init --recursive
 ```
 
-Clone:
-
-```powershell
-git clone --recursive https://github.com/rexglue/rexglue-sdk.git tools\rexglue-sdk
-```
-
-Build:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-rexglue-official.ps1
-```
-
-On Windows, the build helper materializes libmspack symlinks in the ignored SDK checkout when Git checked them out as text placeholders. It also defaults Clang builds to `-mssse3`, which current ReXGlue sources need for byte-swap intrinsics.
-
-The project build script defaults to:
-
-```powershell
-tools\rexglue-sdk\out\install\win-amd64-nmake
-```
-
-## Extraction Tools
-
-`scripts\extract-game.ps1` defaults to the local 360tools checkout used by the 3U workspace:
-
-```powershell
-..\3Unchallenged\tools\360tools
-```
-
-Pass `-ToolsRoot` to use another checkout.
+Build it once (see [building.md](building.md)). On Windows, `scripts/repair_sdk_symlinks.py`
+first materializes the SDK's libmspack symlinks that Git checked out as text placeholders.
+The SDK and this project are both built with `-mssse3`, the baseline Army of Two needs.
 
 ## Game Data
 
-This project does not provide game files. Put your own legal extraction in `game/`.
+This project provides no game files. Put your own legal disc image in `iso/` and run
+`python scripts/extract_iso.py` to produce `game/` (pure-Python XDVDFS extractor, standard
+library only). See [extraction.md](extraction.md).

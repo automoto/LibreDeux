@@ -1,0 +1,76 @@
+{
+  "targets": [
+    {
+      "file": "generated/default/aot_recomp.62.cpp",
+      "labels": [
+        "loc_aot_skip_first_shader_backend",
+        "loc_aot_skip_second_shader_backend"
+      ],
+      "segments": [
+        {
+          "description": "first shader/backend factory guard",
+          "needle": "\t// bl 0x82a780a0\n\tctx.lr = 0x829CA1C4;\n\tsub_82A780A0(ctx, base);\n\t// lwz r3,96(r1)",
+          "replacement": "\t// bl 0x82a780a0\n\tctx.lr = 0x829CA1C4;\n\tsub_82A780A0(ctx, base);\n\tif (ctx.r3.s32 < 0 || REX_LOAD_U32(ctx.r1.u32 + 96) < 0x1000) {\n\t\tREXLOG_WARN(\"AOT workaround: first shader backend factory failed rc=0x{:08X} out=0x{:08X}; skipping dereference\",\n\t\t            ctx.r3.u32, REX_LOAD_U32(ctx.r1.u32 + 96));\n\t\tgoto loc_aot_skip_first_shader_backend;\n\t}\n\t// lwz r3,96(r1)"
+        },
+        {
+          "description": "first shader/backend skip label",
+          "needle": "\t// lwz r3,27520(r28)\n\tctx.r3.u64 = REX_LOAD_U32(ctx.r28.u32 + 27520);",
+          "replacement": "\t// lwz r3,27520(r28)\nloc_aot_skip_first_shader_backend:\n\tctx.r3.u64 = REX_LOAD_U32(ctx.r28.u32 + 27520);"
+        },
+        {
+          "description": "second shader/backend factory guard",
+          "needle": "\t// bl 0x82a780a0\n\tctx.lr = 0x829CA244;\n\tsub_82A780A0(ctx, base);\n\t// lwz r3,96(r1)",
+          "replacement": "\t// bl 0x82a780a0\n\tctx.lr = 0x829CA244;\n\tsub_82A780A0(ctx, base);\n\tif (ctx.r3.s32 < 0 || REX_LOAD_U32(ctx.r1.u32 + 96) < 0x1000) {\n\t\tREXLOG_WARN(\"AOT workaround: second shader backend factory failed rc=0x{:08X} out=0x{:08X}; skipping dereference\",\n\t\t            ctx.r3.u32, REX_LOAD_U32(ctx.r1.u32 + 96));\n\t\tgoto loc_aot_skip_second_shader_backend;\n\t}\n\t// lwz r3,96(r1)"
+        },
+        {
+          "description": "second shader/backend skip label",
+          "needle": "\t// bctrl \n\tctx.lr = 0x829CA274;\n\tREX_CALL_INDIRECT_FUNC(ctx.ctr.u32);\n\t// addi r1,r1,192\n\tctx.r1.s64 = ctx.r1.s64 + 192;",
+          "replacement": "\t// bctrl \n\tctx.lr = 0x829CA274;\n\tREX_CALL_INDIRECT_FUNC(ctx.ctr.u32);\n\t// addi r1,r1,192\nloc_aot_skip_second_shader_backend:\n\tctx.r1.s64 = ctx.r1.s64 + 192;"
+        }
+      ]
+    },
+    {
+      "file": "generated/default/aot_recomp.63.cpp",
+      "labels": [
+        "loc_aot_skip_first_shell_shader_backend",
+        "loc_aot_skip_second_shell_shader_backend"
+      ],
+      "segments": [
+        {
+          "description": "first shell shader/backend factory guard",
+          "needle": "\t// bl 0x82a780a0\n\tctx.lr = 0x829D6254;\n\tsub_82A780A0(ctx, base);\n\t// lwz r3,96(r1)",
+          "replacement": "\t// bl 0x82a780a0\n\tctx.lr = 0x829D6254;\n\tsub_82A780A0(ctx, base);\n\tif (ctx.r3.s32 < 0 || REX_LOAD_U32(ctx.r1.u32 + 96) < 0x1000) {\n\t\tREXLOG_WARN(\"AOT workaround: first shell shader backend factory failed rc=0x{:08X} out=0x{:08X}; skipping dereference\",\n\t\t            ctx.r3.u32, REX_LOAD_U32(ctx.r1.u32 + 96));\n\t\tgoto loc_aot_skip_first_shell_shader_backend;\n\t}\n\t// lwz r3,96(r1)"
+        },
+        {
+          "description": "first shell shader/backend skip label",
+          "needle": "\t// bctrl \n\tctx.lr = 0x829D6284;\n\tREX_CALL_INDIRECT_FUNC(ctx.ctr.u32);\n\t// addi r11,r1,384\n\tctx.r11.s64 = ctx.r1.s64 + 384;",
+          "replacement": "\t// bctrl \n\tctx.lr = 0x829D6284;\n\tREX_CALL_INDIRECT_FUNC(ctx.ctr.u32);\n\t// addi r11,r1,384\nloc_aot_skip_first_shell_shader_backend:\n\tctx.r11.s64 = ctx.r1.s64 + 384;"
+        },
+        {
+          "description": "second shell shader/backend factory guard",
+          "needle": "\t// bl 0x82a780a0\n\tctx.lr = 0x829D62D0;\n\tsub_82A780A0(ctx, base);\n\t// lwz r3,96(r1)",
+          "replacement": "\t// bl 0x82a780a0\n\tctx.lr = 0x829D62D0;\n\tsub_82A780A0(ctx, base);\n\tif (ctx.r3.s32 < 0 || REX_LOAD_U32(ctx.r1.u32 + 96) < 0x1000) {\n\t\tREXLOG_WARN(\"AOT workaround: second shell shader backend factory failed rc=0x{:08X} out=0x{:08X}; skipping dereference\",\n\t\t            ctx.r3.u32, REX_LOAD_U32(ctx.r1.u32 + 96));\n\t\tgoto loc_aot_skip_second_shell_shader_backend;\n\t}\n\t// lwz r3,96(r1)"
+        },
+        {
+          "description": "second shell shader/backend skip label",
+          "needle": "\t// bctrl \n\tctx.lr = 0x829D6300;\n\tREX_CALL_INDIRECT_FUNC(ctx.ctr.u32);\n\t// li r11,1\n\tctx.r11.s64 = 1;\n\t// stw r11,-29096(r29)\n\tREX_STORE_U32(ctx.r29.u32 + -29096, ctx.r11.u32);\nloc_829D6308:",
+          "replacement": "\t// bctrl \n\tctx.lr = 0x829D6300;\n\tREX_CALL_INDIRECT_FUNC(ctx.ctr.u32);\n\t// li r11,1\n\tctx.r11.s64 = 1;\n\t// stw r11,-29096(r29)\n\tREX_STORE_U32(ctx.r29.u32 + -29096, ctx.r11.u32);\nloc_aot_skip_second_shell_shader_backend:\nloc_829D6308:"
+        }
+      ]
+    },
+    {
+      "file": "generated/default/aot_init.h",
+      "labels": [
+        "AOT local co-op direct import reroute",
+        "__imp__AotXamUserGetSigninState"
+      ],
+      "segments": [
+        {
+          "description": "local co-op direct import declarations and reroutes",
+          "needle": "DECLARE_REX_FUNC(__imp__XamUserReadProfileSettings);\nDECLARE_REX_FUNC(__imp__XamUserWriteProfileSettings);",
+          "replacement": "DECLARE_REX_FUNC(__imp__XamUserReadProfileSettings);\nDECLARE_REX_FUNC(__imp__XamUserWriteProfileSettings);\n\n// AOT local co-op direct import reroute. Generated C++ calls imported XAM\n// thunks directly, so PPCFuncMappings replacement alone does not intercept\n// these call sites.\nREX_EXTERN(__imp__AotXamUserGetName);\nREX_EXTERN(__imp__AotXamUserGetSigninState);\nREX_EXTERN(__imp__AotXamUserAreUsersFriends);\nREX_EXTERN(__imp__AotXamUserCheckPrivilege);\nREX_EXTERN(__imp__AotXamUserGetXUID);\nREX_EXTERN(__imp__AotXamInputGetCapabilities);\nREX_EXTERN(__imp__AotXamInputGetState);\nREX_EXTERN(__imp__AotXamInputSetState);\nREX_EXTERN(__imp__AotXamUserGetSigninInfo);\nREX_EXTERN(__imp__AotXamShowSigninUI);\nREX_EXTERN(__imp__AotXamUserReadProfileSettings);\nREX_EXTERN(__imp__AotXamUserWriteProfileSettings);\n\n#define __imp__XamUserGetName __imp__AotXamUserGetName\n#define __imp__XamUserGetSigninState __imp__AotXamUserGetSigninState\n#define __imp__XamUserAreUsersFriends __imp__AotXamUserAreUsersFriends\n#define __imp__XamUserCheckPrivilege __imp__AotXamUserCheckPrivilege\n#define __imp__XamUserGetXUID __imp__AotXamUserGetXUID\n#define __imp__XamInputGetCapabilities __imp__AotXamInputGetCapabilities\n#define __imp__XamInputGetState __imp__AotXamInputGetState\n#define __imp__XamInputSetState __imp__AotXamInputSetState\n#define __imp__XamUserGetSigninInfo __imp__AotXamUserGetSigninInfo\n#define __imp__XamShowSigninUI __imp__AotXamShowSigninUI\n#define __imp__XamUserReadProfileSettings __imp__AotXamUserReadProfileSettings\n#define __imp__XamUserWriteProfileSettings __imp__AotXamUserWriteProfileSettings"
+        }
+      ]
+    }
+  ]
+}

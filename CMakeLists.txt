@@ -15,7 +15,7 @@ if(NOT rexglue_FOUND)
 endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/sources.cmake")
-    message(FATAL_ERROR "generated/default/sources.cmake is missing. Put your legal extraction in game/ and run scripts/build-aot.ps1 -Regenerate first.")
+    message(FATAL_ERROR "generated/default/sources.cmake is missing. Extract your game and generate code first: python scripts/extract_iso.py then python scripts/codegen.py (see README).")
 endif()
 
 include(generated/default/sources.cmake)

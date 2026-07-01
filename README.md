@@ -1,85 +1,102 @@
 # Libre Army of Two
 
-Libre Army of Two is a ReXGlue-based native PC recompilation workspace for Army of Two on Xbox 360.
+A [ReXGlue](https://github.com/rexglue)-based native PC static recompilation of
+**Army of Two** (Xbox 360).
 
-Compatibility note: you must provide your own legally obtained disc/ISO extraction. This repository does not include game assets, retail binaries, generated code from a retail binary, keys, patches, or downloads.
+You must provide your own legally obtained disc image. This repository contains **no**
+game assets, retail binaries, code generated from a retail binary, keys, or downloads.
 
-## Quick Start
+## Dependencies
 
-Clone or place the official ReXGlue SDK under ignored local tools:
+- **CMake** 3.25+ and **Ninja**
+- **LLVM/Clang** at `C:\Program Files\LLVM` (the presets reference it there)
+- **Visual Studio 2022 Build Tools** with the Desktop C++ workload (MSVC headers,
+  Windows SDK, `vcvarsall.bat`)
+- **Python 3** (game extraction + codegen; standard library only)
 
-```powershell
-git clone --recursive https://github.com/rexglue/rexglue-sdk.git tools\rexglue-sdk
+## Build & Run
+
+Run the CMake commands from an **"x64 Native Tools Command Prompt for VS 2022"** with
+`C:\Program Files\LLVM\bin` on `PATH`, so Clang finds the MSVC/Windows SDK environment.
+Each step must succeed before the next.
+
+**1. Clone with submodules** (the ReXGlue SDK is a submodule under `tools/`):
+
+```
+git clone --recurse-submodules <repo_url>
+cd LibreArmyOfTwo
 ```
 
-Build and install the official SDK:
+Already cloned without `--recurse-submodules`? Run
+`git submodule update --init --recursive`.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-rexglue-official.ps1
+**2. Extract your game.** Put your own legal Army of Two disc image in `iso\`, then:
+
+```
+python scripts\extract_iso.py
 ```
 
-Extract your legally obtained ISO into `game\`:
+This writes the game files to `game\` (with `game\default.xex`).
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\extract-game.ps1
+**3. Build the ReXGlue SDK** (once). On Windows, first materialize the SDK's symlinked
+sources; Tracy (a profiler) is disabled to keep the link clean:
+
+```
+python scripts\repair_sdk_symlinks.py
+cmake --preset win-amd64 -S tools\rexglue-sdk -DCMAKE_C_FLAGS=-mssse3 -DCMAKE_CXX_FLAGS=-mssse3 -DREXGLUE_ENABLE_TRACY=OFF
+cmake --build tools\rexglue-sdk\out\build\win-amd64 --config Release --target install
 ```
 
-Build this project:
+Installs to `tools\rexglue-sdk\out\install\win-amd64`, where the project preset looks.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-aot.ps1 -Regenerate
+**4. Generate the recompiled code** from your game copy (runs ReXGlue codegen, then the
+Army of Two source workarounds):
+
+```
+python scripts\codegen.py
 ```
 
-Run the game manually:
+**5. Configure and build the host:**
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\rungame.ps1 -StopExisting
+```
+cmake --preset release
+cmake --build build\aot-ninja-release --target aot
 ```
 
-Run local split-screen co-op with two XInput controllers:
+**6. Run:**
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\rungame.ps1 -XInput -LocalCoop -StopExisting
 ```
+build\aot-ninja-release\aot.exe --game_data_root=game
+```
+
+Local split-screen co-op with two XInput controllers:
+
+```
+build\aot-ninja-release\aot.exe --game_data_root=game --input_backend=xinput --aot_coop_local
+```
+
+After editing `config\aot_rexglue_overrides.toml` or app source, re-run step 4 (codegen)
+then step 5 (build).
 
 ## Current Status
 
-Scaffold, legal local extraction, official ReXGlue code generation, and host
-build are working locally. The current build boots into the visible main menu,
-reaches single-player gameplay, and supports local split-screen co-op with two
-XInput controllers. In-engine Bink movies/cutscenes play through a host overlay,
-and HDR exposure is corrected (no more washed-out/over-bright rendering).
+Boots into the visible main menu, reaches single-player gameplay, and supports local
+split-screen co-op with two XInput controllers. In-engine Bink movies/cutscenes play
+through a host overlay, and HDR exposure is corrected.
 
-## Known Issues
+### Known Issues
 
-- **See-through geometry:** some background structures (walls, frames) can render
-  through foreground geometry instead of being occluded. This is a GPU
-  occlusion-query parity gap and is **not fixed in this release** — the production
-  build ships against vanilla ReXGlue. Root-cause analysis and a deferred,
-  SDK-side fix attempt are documented in [docs/fix-visual-bug.md](docs/fix-visual-bug.md)
-  and [docs/fix-occlusion-queries.md](docs/fix-occlusion-queries.md).
+- **See-through geometry:** some background structures can render through foreground
+  geometry (a GPU occlusion-query parity gap). Not fixed in this build; see
+  [docs/fix-occlusion-queries.md](docs/fix-occlusion-queries.md).
 
-## Repo Map
+## ReXGlue SDK
 
-- `config/aot_manifest.toml` - ReXGlue project manifest.
-- `rungame.ps1` - manual game launcher.
-- `scripts/` - extraction, build, analysis, capture, and audit helpers.
-- `src/` - small ReXGlue app customization.
-- `config/` - tracked ReXGlue function hints.
-- `docs/` - setup, legal policy, development notes, and status.
-
-## Rexglue
-
-This repo defaults to the official `rexglue/rexglue-sdk` repository at `tools\rexglue-sdk`. Do not use the 3U compatibility fork unless Army of Two proves it needs the same runtime fixes.
-
-This production release is built against **vanilla** ReXGlue, pinned to commit `e8ce24f` (tip of `main`, "Release v0.8.0", SDK version `0.8.1.4`). After cloning, check out that commit for a reproducible build:
-
-```powershell
-git -C tools\rexglue-sdk checkout e8ce24f
-```
-
-Note: the annotated `v0.8.0` tag points to an earlier commit (`2bdb97f`, version `0.8.0`); we intentionally build against `main`'s "Release v0.8.0" commit instead. The see-through-geometry occlusion fix is **not** part of this build (see Known Issues).
+The `tools/rexglue-sdk` submodule is the **official** `rexglue/rexglue-sdk`, pinned to
+commit `e8ce24f` (SDK `0.8.1.4`). Army of Two builds against vanilla ReXGlue; the
+occlusion fix above is not part of it.
 
 ## Legal / Repo Hygiene
 
-Keep this repo free of game assets and generated game-derived code. See `docs/legal.md`.
+Keep this repo free of game assets and generated game-derived code. See
+[docs/legal.md](docs/legal.md).

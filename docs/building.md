@@ -1,40 +1,51 @@
 # Building
 
-## Expected Layout
+Build from an **"x64 Native Tools Command Prompt for VS 2022"** with
+`C:\Program Files\LLVM\bin` on `PATH`. The build uses CMake + Ninja. See the
+[README](../README.md) for the full step-by-step; this is a quick reference.
+
+## Layout
 
 ```text
-game/default.xex
-tools/rexglue-sdk/out/install/win-amd64-nmake/bin/rexglue.exe
+tools/rexglue-sdk/                              official ReXGlue SDK (git submodule)
+tools/rexglue-sdk/out/install/win-amd64/...     built + installed SDK
+game/default.xex                                your legal extraction (git-ignored)
 ```
 
-`game/`, `generated/`, `build/`, and local tool directories are ignored by git.
+`game/`, `iso/`, `generated/`, `build/`, and other tool outputs are git-ignored.
 
-## Build Official ReXGlue
+## 1. Extract the game
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-rexglue-official.ps1
+```
+python scripts\extract_iso.py            # auto-detects iso\**\*.iso -> game\
+python scripts\extract_iso.py path\to\game.iso
 ```
 
-Use a custom official checkout path:
+## 2. Build the ReXGlue SDK (once, Ninja)
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-rexglue-official.ps1 -RexGlueSource C:\path\to\rexglue-sdk
+```
+python scripts\repair_sdk_symlinks.py
+cmake --preset win-amd64 -S tools\rexglue-sdk -DCMAKE_C_FLAGS=-mssse3 -DCMAKE_CXX_FLAGS=-mssse3 -DREXGLUE_ENABLE_TRACY=OFF
+cmake --build tools\rexglue-sdk\out\build\win-amd64 --config Release --target install
 ```
 
-## Build This Project
+Installs to `tools\rexglue-sdk\out\install\win-amd64` — the path the project preset uses.
+`-mssse3` matches Army of Two's baseline; `-DREXGLUE_ENABLE_TRACY=OFF` skips the Tracy
+profiler (not needed, and it does not link under current LLVM/lld).
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-aot.ps1 -Regenerate
+## 3. Generate code + build this project
+
+```
+python scripts\codegen.py                                  # ReXGlue codegen + AoT workarounds
+cmake --preset release
+cmake --build build\aot-ninja-release --target aot
 ```
 
-Use a custom ReXGlue SDK install path:
+To point at a ReXGlue SDK install elsewhere, override on configure:
+`cmake --preset release -DCMAKE_PREFIX_PATH=C:\path\to\rexglue\install`.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-aot.ps1 -Regenerate -RexGluePrefix C:\path\to\rexglue\install
+## 4. Launch
+
 ```
-
-## Launch
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\rungame.ps1 -StopExisting
+build\aot-ninja-release\aot.exe --game_data_root=game
 ```

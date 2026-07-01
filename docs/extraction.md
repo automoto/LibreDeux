@@ -1,23 +1,20 @@
 # Extraction
 
-Use only a legally obtained compatible game copy.
+Use only a legally obtained compatible game copy. Put your Army of Two disc image
+anywhere under `iso/` (any subfolder), then run:
 
-The local ISO currently expected by the helper is:
-
-```text
-iso/Army of Two (USA)(1)/Army of Two (USA).iso
+```
+python scripts\extract_iso.py
 ```
 
-Extract with:
+This auto-detects the first `*.iso` under `iso/` and extracts it to `game/` (producing
+`game/default.xex`). To point at a specific image:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\extract-game.ps1
+```
+python scripts\extract_iso.py "iso\Army of Two (USA).iso"
 ```
 
-Capture XEX header and import notes into ignored `private/`:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\extract-game.ps1 -Analyze
-```
-
-If the ISO extractor reports that the disc image may be encrypted, use a legal local extractor such as `extract-xiso` outside this public tree, then place the extracted files in `game/` so `game/default.xex` exists.
+The extractor is pure Python (standard library) and parses the Xbox 360 XDVDFS
+filesystem directly. If it reports that the disc image may be encrypted, decrypt/redump it
+or use a legal local extractor such as `extract-xiso`, then place the files in `game/` so
+`game/default.xex` exists.
