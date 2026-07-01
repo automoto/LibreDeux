@@ -26,7 +26,6 @@ rexglue-install/
 artifacts/
 logs/
 *.log
-*.png
 
 # RenderDoc/PIX captures and shader dumps (debug only).
 *.rdc
