@@ -87,8 +87,7 @@ through a host overlay, and HDR exposure is corrected.
 ### Known Issues
 
 - **See-through geometry:** some background structures can render through foreground
-  geometry (a GPU occlusion-query parity gap). Not fixed in this build; see
-  [docs/fix-occlusion-queries.md](docs/fix-occlusion-queries.md).
+  geometry (a GPU occlusion-query parity gap). Not fixed in this build yet.
 
 ## ReXGlue SDK
 
