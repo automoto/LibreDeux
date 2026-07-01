@@ -6,6 +6,9 @@ A [ReXGlue](https://github.com/rexglue)-based native PC static recompilation of
 You must provide your own legally obtained disc image. This repository contains **no**
 game assets, retail binaries, code generated from a retail binary, keys, or downloads.
 
+![](docs/screens/Screenshot%202026-07-01%20015317.png)
+![](docs/screens/Screenshot%202026-07-01%20015409.png)
+
 ## Dependencies
 
 - **CMake** 3.25+ and **Ninja**
